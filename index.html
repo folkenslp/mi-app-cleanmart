@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Este ícono '🫧' se mostrará en la pestaña del navegador -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🫧</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Metadatos para la PWA (Progressive Web App) -->
+    <meta name="description" content="CleanMart - Venta de productos de limpieza" />
+    <meta name="theme-color" content="#3B82F6" />
+    <link rel="manifest" href="/manifest.webmanifest"> <!-- vite-plugin-pwa generará este archivo -->
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="CleanMart">
+
+    <title>CleanMart - Productos de Limpieza</title>
+  </head>
+  <body>
+    <!-- Aquí es donde React dibuja toda la aplicación -->
+    <div id="root"></div>
+    <!-- Este script carga tu archivo src/main.jsx -->
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
