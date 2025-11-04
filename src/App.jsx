@@ -126,8 +126,8 @@ export default function App() {
   const [customerName, setCustomerName] = useLocalStorage('cleanMartCustomerName', '');
   const [customerPhone, setCustomerPhone] = useLocalStorage('cleanMartCustomerPhone', '');
   
-  // Campo del Negocio
-  const [businessPhone, setBusinessPhone] = useLocalStorage('cleanMartBusinessPhone', '');
+  // Campo del Negocio (Fijo)
+  const BUSINESS_WHATSAPP_NUMBER = "4446013668";
   
   // Estados para el Historial de Ventas
   const [ventasACredito, setVentasACredito] = useLocalStorage('cleanMartVentasCredito', []);
@@ -173,12 +173,17 @@ export default function App() {
 
   // --- Listas de Datos ---
   const categories = ['Todos', 'Lavandería', 'Desinfección', 'Limpieza General', 'Cocina', 'Higiene Personal', 'Control de Plagas', 'Aromas'];
+  // Lista de tamaños SIN 500ml
   const sizes = ['1L', '2L', '5L', '10L', '20L', 'Galón'];
+  // Lista de tamaños CON 500ml para productos especiales
   const sizesForSpecialProducts = ['500ml', '1L', '2L', '5L', '10L', '20L', 'Galón'];
+  // Lista de tamaños para Pastillas de Cloro
   const sizesForPastillas = ['1/2 Kg', '1 Kg'];
+  // Lista de aromas para detergente de trastes (en mayúsculas)
   const dishSoapFragrances = ['LIMÓN', 'NARANJA'];
   const emojis = ['🧴', '🧪', '🧽', '🍽️', '🌲', '🧺', '🌸', '💧', '🧼', '🎨', '✨', '💫', '🫧', '⚪', '🔧', '🧹', '👕', '🦟', '🌿', '🪟', '🐜', '🚿', '🌺', '🐾', '🚽', '🟢'];
 
+  // Productos que usan fragancia personalizada
   const productsWithCustomFragrance = [
     'Limpiador Multiusos Tipo Fabuloso',
     'Shampoo Capilar a Base de Romero',
@@ -186,13 +191,14 @@ export default function App() {
     'Body Shower'
   ];
 
-  // --- Productos que tienen 500ml pero NO fragancia personalizada ---
+  // Productos que tienen la opción de 500ml (y usan la regla de precio especial)
   const productsWith500ml = [
     'Shampoo Capilar a Base de Romero',
     'Aromatizante',
     'Body Shower'
   ];
   
+  // Productos que se agregan directo sin modal
   const productsWithNoOptions = [
     // 'Pastillas de Cloro' ya no está aquí
   ];
@@ -269,7 +275,6 @@ export default function App() {
 
     // Cálculo de precio
     let calculatedPrice = 0;
-    // --- MODIFICADO: usa 'productsWith500ml' ---
     const isSpecial500ml = selectedSize === '500ml' && productsWith500ml.includes(selectedProduct.name);
 
     if (isPastillasCloro) { 
@@ -336,10 +341,7 @@ export default function App() {
       alert('Por favor ingresa el nombre y teléfono del cliente.');
       return;
     }
-    if (!businessPhone.trim()) {
-      alert('Por favor ingresa el número de WhatsApp del negocio.');
-      return;
-    }
+    
     if (cart.length === 0) {
       alert('Tu carrito está vacío');
       return;
@@ -397,7 +399,7 @@ export default function App() {
     
     // 5. Abrir WhatsApp
     const encodedMessage = encodeURIComponent(message);
-    const cleanPhone = businessPhone.replace(/\D/g, '');
+    const cleanPhone = BUSINESS_WHATSAPP_NUMBER.replace(/\D/g, '');
     const phoneWithPrefix = cleanPhone.startsWith('52') ? cleanPhone : `52${cleanPhone}`;
     const whatsappUrl = `https://wa.me/${phoneWithPrefix}?text=${encodedMessage}`;
     
@@ -733,19 +735,7 @@ export default function App() {
                     />
                   </div>
                   
-                  {/* Campo de WhatsApp del Negocio (Oculto/Configuración) */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      WhatsApp del Negocio *
-                    </label>
-                    <input
-                      type="tel"
-                      value={businessPhone}
-                      onChange={(e) => setBusinessPhone(e.target.value)}
-                      placeholder="Tu número (se guardará)"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
+                  {/* Campo de WhatsApp del Negocio (Oculto) */}
                   
                   {/* Check de Venta a Crédito */}
                   <div className="mb-4">
@@ -842,11 +832,11 @@ export default function App() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">-- Elige un tamaño --</option>
-                {/* --- LÓGICA DE TAMAÑO MODIFICADA --- */}
+                {/* --- LÓGICA DE TAMAÑO CORREGIDA --- */}
                 {(
                   selectedProduct.id === 17 // Es Pastillas de Cloro?
                   ? sizesForPastillas
-                  : (productsWith500ml.includes(selectedProduct.name)) // Es Shampoo, Body, Aromatizante?
+                  : productsWith500ml.includes(selectedProduct.name) // Es producto especial 500ml?
                     ? sizesForSpecialProducts 
                     : sizes // Es un producto normal (Cloro, Fabuloso, etc.)
                 ).map(size => (
