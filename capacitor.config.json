@@ -1,0 +1,14 @@
+{
+  "appId": "com.cleanmart.posapp",
+  "appName": "CleanMart",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "CapacitorAssets": {
+      "icon": {
+        "source": "icon-512.png",
+        "resize": true
+      }
+    }
+  }
+}

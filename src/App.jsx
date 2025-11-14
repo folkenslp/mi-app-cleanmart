@@ -396,6 +396,9 @@ export default function App() {
     // 4. Limpiar el carrito y reiniciar el check
     setCart([]);
     setIsCreditSale(false);
+    // --- MODIFICADO: Limpiar los campos del cliente ---
+    setCustomerName('');
+    setCustomerPhone('');
     
     // 5. Abrir WhatsApp
     const encodedMessage = encodeURIComponent(message);
@@ -875,96 +878,83 @@ export default function App() {
               Gestión de Ventas
             </h3>
 
-            {/* Sección de Ventas a Crédito */}
-            <h4 className="text-lg font-semibold text-yellow-700 mb-3 flex items-center">
-              <CreditCard size={20} className="mr-2" />
-              Ventas a Crédito (Por Cobrar)
+            {/* --- MODIFICACIÓN: Historial Unificado --- */}
+            <h4 className="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+              Historial General de Ventas
             </h4>
-            <div className="space-y-4 mb-6 max-h-64 overflow-y-auto pr-2">
-              {ventasACredito.length === 0 ? (
-                <p className="text-gray-500">No hay ventas a crédito pendientes.</p>
+            <div className="space-y-4 mb-6 max-h-[70vh] overflow-y-auto pr-2">
+              {ventasACredito.length === 0 && ventasPagadas.length === 0 ? (
+                <p className="text-gray-500">No hay ventas registradas.</p>
               ) : (
-                ventasACredito.map(sale => (
-                  <div key={sale.id} className="border border-yellow-200 bg-yellow-50 p-4 rounded-lg">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                      <div className="flex-1">
-                        <p className="font-bold text-gray-800">{sale.customerName}</p>
-                        <p className="text-sm text-gray-600">{sale.customerPhone}</p>
-                        <p className="text-lg font-semibold text-blue-600">${sale.total.toFixed(2)}</p>
-                        <p className="text-xs text-gray-500">
-                          Pedido: {new Date(sale.createdAt).toLocaleString()}
-                        </p>
-                        <details className="text-sm mt-2 cursor-pointer">
-                          <summary className="font-medium text-gray-600">Ver {sale.itemCount} productos...</summary>
-                          <ul className="list-disc pl-5 mt-1">
-                            {sale.cart.map(item => (
-                              <li key={item.uniqueId}>
-                                {item.quantity}x {item.name} 
-                                {item.fragrance !== "N/A" ? ` (${item.size}, ${item.fragrance})` : ` (${item.size})`}
-                              </li>
-                            ))}
-                          </ul>
-                        </details>
-                      </div>
-                      <div className="mt-4 sm:mt-0 sm:ml-4 flex-shrink-0 flex flex-col space-y-2">
-                        <button
-                          onClick={() => markAsPaid(sale.id)}
-                          className="flex items-center justify-center space-x-2 cursor-pointer p-2 bg-green-200 text-green-800 rounded-lg hover:bg-green-300 font-medium"
-                        >
-                          <CheckCircle size={18} />
-                          <span>Marcar como Pagada</span>
-                        </button>
-                        <button
-                          onClick={() => handleGenerateReminder(sale)}
-                          disabled={isLoadingReminder}
-                          className="flex items-center justify-center space-x-2 cursor-pointer p-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 font-medium disabled:bg-gray-200"
-                        >
-                          <Sparkles size={18} />
-                          <span>Recordar Pago</span>
-                        </button>
+                [...ventasACredito, ...ventasPagadas]
+                  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) // Ordenar por fecha, más nuevas primero
+                  .map(sale => (
+                    <div 
+                      key={sale.id} 
+                      className={`border p-4 rounded-lg ${
+                        sale.type === 'Crédito' ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center mb-1">
+                            <p className="font-bold text-gray-800 mr-2">{sale.customerName}</p>
+                            {/* Etiqueta de Estado */}
+                            {sale.type === 'Crédito' ? (
+                              <span className="text-xs font-medium text-yellow-800 bg-yellow-200 px-2 py-0.5 rounded-full">
+                                A CRÉDITO
+                              </span>
+                            ) : (
+                              <span className="text-xs font-medium text-green-800 bg-green-200 px-2 py-0.5 rounded-full">
+                                PAGADA
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600">{sale.customerPhone}</p>
+                          <p className="text-lg font-semibold text-blue-600">${sale.total.toFixed(2)}</p>
+                          <p className="text-xs text-gray-500">
+                            {sale.type === 'Pagada' && sale.paidAt 
+                              ? `Pagado: ${new Date(sale.paidAt).toLocaleString()}` 
+                              : `Pedido: ${new Date(sale.createdAt).toLocaleString()}`}
+                          </p>
+                          <details className="text-sm mt-2 cursor-pointer">
+                            <summary className="font-medium text-gray-600">Ver {sale.itemCount} productos...</summary>
+                            <ul className="list-disc pl-5 mt-1">
+                              {sale.cart.map(item => (
+                                <li key={item.uniqueId}>
+                                  {item.quantity}x {item.name} 
+                                  {item.fragrance !== "N/A" ? ` (${item.size}, ${item.fragrance})` : ` (${item.size})`}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        </div>
+                        {/* Mostrar botones solo si la venta es a Crédito */}
+                        {sale.type === 'Crédito' && (
+                          <div className="mt-4 sm:mt-0 sm:ml-4 flex-shrink-0 flex flex-col space-y-2">
+                            <button
+                              onClick={() => markAsPaid(sale.id)}
+                              className="flex items-center justify-center space-x-2 cursor-pointer p-2 bg-green-200 text-green-800 rounded-lg hover:bg-green-300 font-medium"
+                            >
+                              <CheckCircle size={18} />
+                              <span>Marcar como Pagada</span>
+                            </button>
+                            <button
+                              onClick={() => handleGenerateReminder(sale)}
+                              disabled={isLoadingReminder}
+                              className="flex items-center justify-center space-x-2 cursor-pointer p-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 font-medium disabled:bg-gray-200"
+                            >
+                              <Sparkles size={18} />
+                              <span>Recordar Pago</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))
               )}
             </div>
-
-            {/* Sección de Historial de Compras */}
-            <h4 className="text-lg font-semibold text-green-700 mb-3 flex items-center">
-              <CheckCircle size={20} className="mr-2" />
-              Historial de Ventas Pagadas
-            </h4>
-            <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-               {ventasPagadas.length === 0 ? (
-                <p className="text-gray-500">No hay ventas pagadas.</p>
-              ) : (
-                ventasPagadas.map(sale => (
-                  <div key={sale.id} className="border border-green-200 bg-green-50 p-4 rounded-lg">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-bold text-gray-800">{sale.customerName}</p>
-                        <p className="text-lg font-semibold text-green-700">${sale.total.toFixed(2)}</p>
-                        <p className="text-xs text-gray-500">
-                          {sale.paidAt ? `Pagado: ${new Date(sale.paidAt).toLocaleString()}` : `Registrado: ${new Date(sale.createdAt).toLocaleString()}`}
-                        </p>
-                      </div>
-                      <details className="text-sm cursor-pointer">
-                        <summary className="font-medium text-gray-600">Ver {sale.itemCount} productos...</summary>
-                        <ul className="list-disc pl-5 mt-1">
-                          {sale.cart.map(item => (
-                            <li key={item.uniqueId}>
-                              {item.quantity}x {item.name}
-                              {item.fragrance !== "N/A" ? ` (${item.size}, ${item.fragrance})` : ` (${item.size})`}
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
+            
             <button
               onClick={() => setShowSalesModal(false)}
               className="mt-8 w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition font-medium"
@@ -1220,4 +1210,3 @@ export default function App() {
     </div>
   );
 }
-
