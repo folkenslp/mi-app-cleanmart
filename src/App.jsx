@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react'; // 1. Importar useRef
-// Importamos nuevos íconos para el panel de admin
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   ShoppingCart, Plus, Minus, Trash2, Search, Package, Send, Clock, CreditCard, 
-  CheckCircle, Sparkles, Settings, Lock, Check, X, Save 
+  CheckCircle, Sparkles, Settings, Lock, Check, X, Save, Printer, Tag, Users, 
+  BarChart3, TrendingUp, DollarSign, PieChart 
 } from 'lucide-react';
 
 // --- Hook de LocalStorage ---
@@ -29,7 +29,7 @@ const useLocalStorage = (key, initialValue) => {
   return [storedValue, setValue];
 };
 
-// --- Datos Iniciales (¡ORDENADOS ALFABÉTICAMENTE!) ---
+// --- Datos Iniciales (Ordenados Alfabéticamente) ---
 const initialProducts = [
   { id: 27, name: 'Aromatizante', price: 55.00, category: 'Aromas', image: '🌺', stock: 50, unit: 'L' },
   { id: 26, name: 'Body Shower', price: 43.00, category: 'Higiene Personal', image: '🚿', stock: 50, unit: 'L' },
@@ -122,9 +122,11 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
 
-  // Campos del Cliente
+  // Campos del Cliente (Teléfono Eliminado)
   const [customerName, setCustomerName] = useLocalStorage('cleanMartCustomerName', '');
-  const [customerPhone, setCustomerPhone] = useLocalStorage('cleanMartCustomerPhone', '');
+
+  // --- NUEVO: Base de Datos de Clientes ---
+  const [savedCustomers, setSavedCustomers] = useLocalStorage('cleanMartCustomers', []);
   
   // Campo del Negocio (Fijo)
   const BUSINESS_WHATSAPP_NUMBER = "4446013668";
@@ -156,7 +158,7 @@ export default function App() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [adminError, setAdminError] = useState('');
-  const [adminView, setAdminView] = useState('edit'); // 'edit' o 'add'
+  const [adminView, setAdminView] = useState('dashboard'); // 'dashboard' | 'edit' | 'add'
   const [editingProduct, setEditingProduct] = useState(null); // Producto que se está editando
   const [editedPrice, setEditedPrice] = useState('');
   const [newProductForm, setNewProductForm] = useState({
@@ -173,17 +175,12 @@ export default function App() {
 
   // --- Listas de Datos ---
   const categories = ['Todos', 'Lavandería', 'Desinfección', 'Limpieza General', 'Cocina', 'Higiene Personal', 'Control de Plagas', 'Aromas'];
-  // Lista de tamaños SIN 500ml
   const sizes = ['1L', '2L', '5L', '10L', '20L', 'Galón'];
-  // Lista de tamaños CON 500ml para productos especiales
   const sizesForSpecialProducts = ['500ml', '1L', '2L', '5L', '10L', '20L', 'Galón'];
-  // Lista de tamaños para Pastillas de Cloro
   const sizesForPastillas = ['1/2 Kg', '1 Kg'];
-  // Lista de aromas para detergente de trastes (en mayúsculas)
   const dishSoapFragrances = ['LIMÓN', 'NARANJA'];
   const emojis = ['🧴', '🧪', '🧽', '🍽️', '🌲', '🧺', '🌸', '💧', '🧼', '🎨', '✨', '💫', '🫧', '⚪', '🔧', '🧹', '👕', '🦟', '🌿', '🪟', '🐜', '🚿', '🌺', '🐾', '🚽', '🟢'];
 
-  // Productos que usan fragancia personalizada
   const productsWithCustomFragrance = [
     'Limpiador Multiusos Tipo Fabuloso',
     'Shampoo Capilar a Base de Romero',
@@ -191,17 +188,13 @@ export default function App() {
     'Body Shower'
   ];
 
-  // Productos que tienen la opción de 500ml (y usan la regla de precio especial)
   const productsWith500ml = [
     'Shampoo Capilar a Base de Romero',
     'Aromatizante',
     'Body Shower'
   ];
   
-  // Productos que se agregan directo sin modal
-  const productsWithNoOptions = [
-    // 'Pastillas de Cloro' ya no está aquí
-  ];
+  const productsWithNoOptions = [];
 
 
   // --- NUEVA FUNCIÓN: Scroll al Carrito ---
@@ -209,9 +202,49 @@ export default function App() {
     cartRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // --- CALCULO DE ESTADISTICAS DASHBOARD ---
+  const dashboardStats = useMemo(() => {
+    const allSales = [...ventasPagadas, ...ventasACredito];
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    let salesToday = 0;
+    let salesMonth = 0;
+    let pendingCredit = 0;
+    const productStats = {};
+
+    allSales.forEach(sale => {
+      const saleTime = new Date(sale.createdAt).getTime();
+      
+      // Calcular ventas
+      if (saleTime >= startOfDay) salesToday += sale.total;
+      if (saleTime >= startOfMonth) salesMonth += sale.total;
+
+      // Contar productos
+      sale.cart.forEach(item => {
+        productStats[item.name] = (productStats[item.name] || 0) + item.quantity;
+      });
+    });
+
+    // Calcular crédito pendiente
+    ventasACredito.forEach(sale => pendingCredit += sale.total);
+
+    // Ordenar productos más vendidos
+    const topProducts = Object.entries(productStats)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([name, quantity]) => ({ name, quantity }));
+      
+    // Encontrar la cantidad máxima para la barra de progreso
+    const maxQuantity = topProducts.length > 0 ? topProducts[0].quantity : 1;
+
+    return { salesToday, salesMonth, pendingCredit, topProducts, maxQuantity };
+  }, [ventasPagadas, ventasACredito]);
+
+
   // --- Funciones del Carrito ---
   
-  // Esta función AHORA ABRE EL MODAL
   const openProductModal = (product) => {
     setSelectedProduct(product);
     setCustomFragrance('');
@@ -220,7 +253,6 @@ export default function App() {
     setShowProductModal(true);
   };
 
-  // --- NUEVA FUNCIÓN: Para agregar productos sin opciones ---
   const addSimpleProductToCart = (product) => {
     const uniqueId = `${product.id}`; 
     
@@ -244,7 +276,6 @@ export default function App() {
   };
 
 
-  // Esta función se llama DESDE EL MODAL para agregar al carrito
   const confirmAddToCart = () => {
     const needsCustomFragrance = productsWithCustomFragrance.includes(selectedProduct.name);
     const isDishSoap = selectedProduct.id === 3;
@@ -322,7 +353,6 @@ export default function App() {
     setSelectedProduct(null);
   };
 
-  // Ahora usa uniqueId en lugar de id
   const updateQuantity = (uniqueId, delta) => {
     setCart(currentCart =>
       currentCart.map(item =>
@@ -334,11 +364,93 @@ export default function App() {
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  // --- Función de Envío de Pedido (Modificada) ---
-  const sendWhatsAppOrder = () => { // Ya no es async
+  // --- NUEVA FUNCIÓN: IMPRESIÓN DE ETIQUETAS (10x5 cm) ---
+  const handlePrintLabels = (sale) => {
+    const printWindow = window.open('', '', 'width=600,height=400');
+    
+    // Logo en formato SVG Data URI (Clean Mart con burbujas y fondo azul)
+    const cleanMartLogo = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%233B82F6' rx='80'/%3E%3Ccircle cx='200' cy='200' r='90' fill='white'/%3E%3Ccircle cx='380' cy='150' r='40' fill='white'/%3E%3Ccircle cx='420' cy='280' r='50' fill='white'/%3E%3Ccircle cx='120' cy='120' r='30' fill='white'/%3E%3Ctext x='50%25' y='420' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-weight='900' font-size='70' fill='white' style='text-shadow: 2px 2px 4px rgba(0,0,0,0.2);'%3EClean Mart%3C/text%3E%3C/svg%3E";
+
+    const itemsToPrint = [];
+    sale.cart.forEach(item => {
+      for (let i = 0; i < item.quantity; i++) {
+        itemsToPrint.push(item);
+      }
+    });
+
+    const printContent = `
+      <html>
+        <head>
+          <title>Etiquetas - CleanMart</title>
+          <style>
+            @page { size: 10cm 5cm; margin: 0; }
+            body { 
+              font-family: sans-serif; 
+              margin: 0; 
+              padding: 0; 
+            }
+            .label { 
+              width: 10cm;
+              height: 5cm;
+              box-sizing: border-box;
+              padding: 3mm 5mm;
+              border: 1px dashed #ccc; /* Borde visible en pantalla */
+              page-break-after: always;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              text-align: center;
+              position: relative;
+            }
+            @media print {
+              .label { border: none; } /* Sin borde al imprimir */
+            }
+            .logo-img {
+              height: 1.4cm; /* Ajustado para 5cm de alto total */
+              width: auto;
+              object-fit: contain;
+              margin-bottom: 2px;
+              border-radius: 8px;
+            }
+            .product-name { font-size: 18px; font-weight: 800; margin: 2px 0; line-height: 1.1; max-height: 2.2em; overflow: hidden; text-transform: capitalize; }
+            .details { font-size: 14px; font-weight: bold; color: #333; margin: 1px 0; }
+            .footer { font-size: 9px; color: #666; margin-top: 4px; border-top: 1px solid #ddd; padding-top: 2px; width: 90%; }
+          </style>
+        </head>
+        <body>
+          ${itemsToPrint.map(item => `
+            <div class="label">
+              <!-- LOGO GENERADO -->
+              <img src="${cleanMartLogo}" class="logo-img" alt="CleanMart Logo" />
+              
+              <div class="product-name">${item.name}</div>
+              
+              <div class="details">
+                 ${item.size}
+                 ${item.fragrance !== 'N/A' ? ` • ${item.fragrance}` : ''}
+              </div>
+              
+              <div class="footer">
+                Cliente: ${sale.customerName} • ${new Date(sale.createdAt).toLocaleDateString()}
+              </div>
+            </div>
+          `).join('')}
+          <script>
+            window.onload = function() { window.print(); window.close(); }
+          </script>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+  };
+
+  const sendWhatsAppOrder = () => { 
     // Validación
-    if (!customerName.trim() || !customerPhone.trim()) {
-      alert('Por favor ingresa el nombre y teléfono del cliente.');
+    if (!customerName.trim()) {
+      alert('Por favor ingresa el nombre del cliente.');
       return;
     }
     
@@ -347,11 +459,17 @@ export default function App() {
       return;
     }
 
-    // 1. Crear el objeto de la venta
+    // --- CRM: Guardar cliente si no existe ---
+    const trimmedName = customerName.trim();
+    if (!savedCustomers.includes(trimmedName)) {
+      // Agregamos el nuevo cliente y ordenamos la lista alfabéticamente
+      const newCustomerList = [...savedCustomers, trimmedName].sort((a, b) => a.localeCompare(b));
+      setSavedCustomers(newCustomerList);
+    }
+
     const newSale = {
       id: Date.now(),
-      customerName,
-      customerPhone,
+      customerName: trimmedName,
       cart: [...cart],
       total,
       itemCount,
@@ -359,17 +477,14 @@ export default function App() {
       type: isCreditSale ? 'Crédito' : 'Pagada'
     };
 
-    // 2. Guardar en la lista correcta (Crédito o Pagadas)
     if (isCreditSale) {
       setVentasACredito([newSale, ...ventasACredito]);
     } else {
       setVentasPagadas([newSale, ...ventasPagadas]);
     }
 
-    // 3. Generar mensaje de WhatsApp
     let message = `🧼 *PEDIDO CLEANMART* 🧼\n\n`;
-    message += `👤 *Cliente:* ${customerName}\n`;
-    message += `📱 *Teléfono:* ${customerPhone}\n`;
+    message += `👤 *Cliente:* ${trimmedName}\n`;
     message += `💰 *Tipo de Venta:* ${isCreditSale ? 'A CRÉDITO' : 'PAGADA'}\n\n`;
     message += `🛒 *PRODUCTOS:*\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n`;
@@ -377,30 +492,26 @@ export default function App() {
     cart.forEach((item, index) => {
       message += `\n${index + 1}. *${item.name}*\n`;
       if (item.fragrance !== "N/A") {
-        message += `   🌸 Aroma: ${item.fragrance}\n`;
+        message += `   🌸 Aroma: ${item.fragrance}\n`;
       }
-      // --- LÓGICA MODIFICADA: Muestra la unidad base para productos simples ---
       if (productsWithNoOptions.includes(item.name) || item.id === 17 /* Pastillas */) {
-        message += `   📦 Tamaño: ${item.size}\n`;
+        message += `   📦 Tamaño: ${item.size}\n`;
       } else {
-        message += `   📦 Tamaño: ${item.size}\n`;
+        message += `   📦 Tamaño: ${item.size}\n`;
       }
-      message += `   💰 Precio Unit.: $${item.price.toFixed(2)}\n`;
-      message += `   🔢 Cantidad: ${item.quantity}\n`;
-      message += `   💵 Subtotal: $${(item.price * item.quantity).toFixed(2)}\n`;
+      message += `   💰 Precio Unit.: $${item.price.toFixed(2)}\n`;
+      message += `   🔢 Cantidad: ${item.quantity}\n`;
+      message += `   💵 Subtotal: $${(item.price * item.quantity).toFixed(2)}\n`;
     });
 
     message += `\n━━━━━━━━━━━━━━━━━━━━\n`;
     message += `\n💰 *TOTAL: $${total.toFixed(2)}*`;
 
-    // 4. Limpiar el carrito y reiniciar el check
+    // Limpiar
     setCart([]);
     setIsCreditSale(false);
-    // --- MODIFICADO: Limpiar los campos del cliente ---
     setCustomerName('');
-    setCustomerPhone('');
     
-    // 5. Abrir WhatsApp
     const encodedMessage = encodeURIComponent(message);
     const cleanPhone = BUSINESS_WHATSAPP_NUMBER.replace(/\D/g, '');
     const phoneWithPrefix = cleanPhone.startsWith('52') ? cleanPhone : `52${cleanPhone}`;
@@ -437,8 +548,7 @@ export default function App() {
     setIsLoadingReminder(false);
   };
   
-  // --- NUEVA FUNCIÓN: Copiar al portapapeles (Compatible con iFrames) ---
-  const copyToClipboard = (text, phone) => {
+  const copyToClipboard = (text) => {
     const textArea = document.createElement("textarea");
     textArea.value = text;
     document.body.appendChild(textArea);
@@ -446,13 +556,7 @@ export default function App() {
     textArea.select();
     try {
       document.execCommand('copy');
-      alert("¡Mensaje copiado! Listo para pegar en WhatsApp.");
-      
-      const cleanPhone = phone.replace(/\D/g, '');
-      const phoneWithPrefix = cleanPhone.startsWith('52') ? cleanPhone : `52${cleanPhone}`;
-      const whatsappUrl = `https://wa.me/${phoneWithPrefix}`;
-      window.open(whatsappUrl, '_blank');
-      
+      alert("¡Mensaje copiado! Abre WhatsApp para pegar.");
       setShowReminderModal(false);
     } catch (err) {
       console.error('Error al copiar: ', err);
@@ -475,6 +579,8 @@ export default function App() {
       setAdminError('');
       setPasswordInput('');
       setShowAdminLogin(false);
+      // --- CAMBIO: Dashboard es la vista por defecto al entrar ---
+      setAdminView('dashboard'); 
       setShowAdminPanel(true);
     } else {
       setAdminError('Contraseña incorrecta');
@@ -532,13 +638,13 @@ export default function App() {
 
   // --- Renderizado del Componente (JSX) ---
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 font-sans">
       {/* --- Encabezado --- */}
       <header className="bg-white shadow-md sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="text-4xl">🫧</div>
+              {/* --- ICONO ELIMINADO AQUÍ --- */}
               <div>
                 <h1 className="text-2xl font-bold text-blue-600">CleanMart</h1>
                 <p className="text-sm text-gray-600">Punto de Venta PWA</p>
@@ -710,35 +816,28 @@ export default function App() {
                     <span className="text-2xl font-bold text-blue-600">${total.toFixed(2)}</span>
                   </div>
 
-                  {/* Campo 1: Nombre Cliente */}
+                  {/* Campo 1: Nombre Cliente (Con Autocompletado) */}
                   <div className="mb-3">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre del Cliente *
                     </label>
-                    <input
-                      type="text"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Nombre de quien recibe"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <div className="relative">
+                        <input
+                        type="text"
+                        list="customer-list" // Conectar con el datalist
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        placeholder="Nombre de quien recibe"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        {/* Lista de sugerencias */}
+                        <datalist id="customer-list">
+                            {savedCustomers.map(name => (
+                                <option key={name} value={name} />
+                            ))}
+                        </datalist>
+                    </div>
                   </div>
-                  
-                  {/* Campo 2: Teléfono Cliente */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Teléfono del Cliente *
-                    </label>
-                    <input
-                      type="tel"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      placeholder="Ej: 4441234567"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  
-                  {/* Campo de WhatsApp del Negocio (Oculto) */}
                   
                   {/* Check de Venta a Crédito */}
                   <div className="mb-4">
@@ -837,11 +936,11 @@ export default function App() {
                 <option value="">-- Elige un tamaño --</option>
                 {/* --- LÓGICA DE TAMAÑO CORREGIDA --- */}
                 {(
-                  selectedProduct.id === 17 // Es Pastillas de Cloro?
+                  selectedProduct.id === 17 // 1. Es Pastillas de Cloro?
                   ? sizesForPastillas
-                  : productsWith500ml.includes(selectedProduct.name) // Es producto especial 500ml?
+                  : productsWith500ml.includes(selectedProduct.name) // 2. Es producto con 500ml?
                     ? sizesForSpecialProducts 
-                    : sizes // Es un producto normal (Cloro, Fabuloso, etc.)
+                    : sizes // 3. Es un producto normal (sin 500ml)
                 ).map(size => (
                   <option key={size} value={size}>{size}</option>
                 ))}
@@ -878,60 +977,53 @@ export default function App() {
               Gestión de Ventas
             </h3>
 
-            {/* --- MODIFICACIÓN: Historial Unificado --- */}
-            <h4 className="text-lg font-semibold text-gray-700 mb-3 flex items-center">
-              Historial General de Ventas
+            {/* Sección: Ventas a Crédito */}
+            <h4 className="text-lg font-semibold text-yellow-700 mb-3 flex items-center border-b border-yellow-200 pb-2">
+              <Clock className="mr-2" size={20} />
+              Ventas a Crédito (Pendientes)
             </h4>
-            <div className="space-y-4 mb-6 max-h-[70vh] overflow-y-auto pr-2">
-              {ventasACredito.length === 0 && ventasPagadas.length === 0 ? (
-                <p className="text-gray-500">No hay ventas registradas.</p>
-              ) : (
-                [...ventasACredito, ...ventasPagadas]
-                  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) // Ordenar por fecha, más nuevas primero
-                  .map(sale => (
-                    <div 
-                      key={sale.id} 
-                      className={`border p-4 rounded-lg ${
-                        sale.type === 'Crédito' ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center mb-1">
-                            <p className="font-bold text-gray-800 mr-2">{sale.customerName}</p>
-                            {/* Etiqueta de Estado */}
-                            {sale.type === 'Crédito' ? (
+            <div className="space-y-4 mb-8 max-h-[40vh] overflow-y-auto pr-2">
+                {ventasACredito.length === 0 ? (
+                    <p className="text-gray-400 italic text-sm">No hay ventas a crédito pendientes.</p>
+                ) : (
+                    ventasACredito.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(sale => (
+                      <div 
+                        key={sale.id} 
+                        className="border border-yellow-200 bg-yellow-50 p-4 rounded-lg"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center mb-1">
+                              <p className="font-bold text-gray-800 mr-2">{sale.customerName}</p>
                               <span className="text-xs font-medium text-yellow-800 bg-yellow-200 px-2 py-0.5 rounded-full">
                                 A CRÉDITO
                               </span>
-                            ) : (
-                              <span className="text-xs font-medium text-green-800 bg-green-200 px-2 py-0.5 rounded-full">
-                                PAGADA
-                              </span>
-                            )}
+                            </div>
+                            <p className="text-lg font-semibold text-blue-600">${sale.total.toFixed(2)}</p>
+                            <p className="text-xs text-gray-500">
+                              Pedido: {new Date(sale.createdAt).toLocaleString()}
+                            </p>
+                            <details className="text-sm mt-2 cursor-pointer">
+                              <summary className="font-medium text-gray-600">Ver {sale.itemCount} productos...</summary>
+                              <ul className="list-disc pl-5 mt-1">
+                                {sale.cart.map(item => (
+                                  <li key={item.uniqueId}>
+                                    {item.quantity}x {item.name} 
+                                    {item.fragrance !== "N/A" ? ` (${item.size}, ${item.fragrance})` : ` (${item.size})`}
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
                           </div>
-                          <p className="text-sm text-gray-600">{sale.customerPhone}</p>
-                          <p className="text-lg font-semibold text-blue-600">${sale.total.toFixed(2)}</p>
-                          <p className="text-xs text-gray-500">
-                            {sale.type === 'Pagada' && sale.paidAt 
-                              ? `Pagado: ${new Date(sale.paidAt).toLocaleString()}` 
-                              : `Pedido: ${new Date(sale.createdAt).toLocaleString()}`}
-                          </p>
-                          <details className="text-sm mt-2 cursor-pointer">
-                            <summary className="font-medium text-gray-600">Ver {sale.itemCount} productos...</summary>
-                            <ul className="list-disc pl-5 mt-1">
-                              {sale.cart.map(item => (
-                                <li key={item.uniqueId}>
-                                  {item.quantity}x {item.name} 
-                                  {item.fragrance !== "N/A" ? ` (${item.size}, ${item.fragrance})` : ` (${item.size})`}
-                                </li>
-                              ))}
-                            </ul>
-                          </details>
-                        </div>
-                        {/* Mostrar botones solo si la venta es a Crédito */}
-                        {sale.type === 'Crédito' && (
                           <div className="mt-4 sm:mt-0 sm:ml-4 flex-shrink-0 flex flex-col space-y-2">
+                            {/* --- NUEVO BOTÓN IMPRIMIR --- */}
+                            <button
+                              onClick={() => handlePrintLabels(sale)}
+                              className="flex items-center justify-center space-x-2 cursor-pointer p-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
+                            >
+                              <Tag size={18} />
+                              <span>Imprimir Productos</span>
+                            </button>
                             <button
                               onClick={() => markAsPaid(sale.id)}
                               className="flex items-center justify-center space-x-2 cursor-pointer p-2 bg-green-200 text-green-800 rounded-lg hover:bg-green-300 font-medium"
@@ -948,11 +1040,66 @@ export default function App() {
                               <span>Recordar Pago</span>
                             </button>
                           </div>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  ))
-              )}
+                    ))
+                )}
+            </div>
+
+            {/* Sección: Ventas Pagadas */}
+            <h4 className="text-lg font-semibold text-green-700 mb-3 flex items-center border-b border-green-200 pb-2">
+              <CheckCircle className="mr-2" size={20} />
+              Historial de Ventas Pagadas
+            </h4>
+            <div className="space-y-4 mb-6 max-h-[40vh] overflow-y-auto pr-2">
+                {ventasPagadas.length === 0 ? (
+                    <p className="text-gray-400 italic text-sm">No hay ventas pagadas registradas.</p>
+                ) : (
+                    ventasPagadas.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(sale => (
+                      <div 
+                        key={sale.id} 
+                        className="border border-green-200 bg-green-50 p-4 rounded-lg"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center mb-1">
+                              <p className="font-bold text-gray-800 mr-2">{sale.customerName}</p>
+                              <span className="text-xs font-medium text-green-800 bg-green-200 px-2 py-0.5 rounded-full">
+                                PAGADA
+                              </span>
+                            </div>
+                            <p className="text-lg font-semibold text-blue-600">${sale.total.toFixed(2)}</p>
+                            <p className="text-xs text-gray-500">
+                              {sale.paidAt 
+                                ? `Pagado: ${new Date(sale.paidAt).toLocaleString()}` 
+                                : `Pedido: ${new Date(sale.createdAt).toLocaleString()}`}
+                            </p>
+                            <details className="text-sm mt-2 cursor-pointer">
+                              <summary className="font-medium text-gray-600">Ver {sale.itemCount} productos...</summary>
+                              <ul className="list-disc pl-5 mt-1">
+                                {sale.cart.map(item => (
+                                  <li key={item.uniqueId}>
+                                    {item.quantity}x {item.name} 
+                                    {item.fragrance !== "N/A" ? ` (${item.size}, ${item.fragrance})` : ` (${item.size})`}
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          </div>
+                           <div className="mt-4 sm:mt-0 sm:ml-4 flex-shrink-0 flex flex-col space-y-2">
+                              {/* --- NUEVO BOTÓN IMPRIMIR --- */}
+                             <button
+                                onClick={() => handlePrintLabels(sale)}
+                                className="flex items-center justify-center space-x-2 cursor-pointer p-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
+                              >
+                                <Tag size={18} />
+                                <span>Imprimir Productos</span>
+                              </button>
+                           </div>
+                        </div>
+                      </div>
+                    ))
+                )}
             </div>
             
             <button
@@ -1000,11 +1147,11 @@ export default function App() {
                 Cerrar
               </button>
               <button
-                onClick={() => copyToClipboard(reminderMessage, currentSaleForReminder.customerPhone)}
+                onClick={() => copyToClipboard(reminderMessage)}
                 disabled={isLoadingReminder || !reminderMessage}
                 className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition font-medium disabled:bg-gray-400"
               >
-                Copiar y Enviar por WhatsApp
+                Copiar Mensaje
               </button>
             </div>
           </div>
@@ -1064,20 +1211,95 @@ export default function App() {
             </div>
 
             {/* Pestañas de Admin */}
-            <div className="flex border-b mb-4">
+            <div className="flex border-b mb-4 overflow-x-auto">
+              <button
+                onClick={() => setAdminView('dashboard')}
+                className={`py-2 px-4 font-medium flex-shrink-0 flex items-center ${adminView === 'dashboard' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+              >
+                <BarChart3 size={16} className="mr-1" /> Dashboard
+              </button>
               <button
                 onClick={() => setAdminView('edit')}
-                className={`py-2 px-4 font-medium ${adminView === 'edit' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                className={`py-2 px-4 font-medium flex-shrink-0 ${adminView === 'edit' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
               >
                 Modificar Precios
               </button>
               <button
                 onClick={() => setAdminView('add')}
-                className={`py-2 px-4 font-medium ${adminView === 'add' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                className={`py-2 px-4 font-medium flex-shrink-0 ${adminView === 'add' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
               >
                 Agregar Producto
               </button>
             </div>
+
+            {/* VISTA: DASHBOARD DE ESTADÍSTICAS */}
+            {adminView === 'dashboard' && (
+                <div className="space-y-6">
+                    {/* Tarjetas de Resumen */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm">
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                                    <DollarSign size={20} />
+                                </div>
+                                <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Hoy</span>
+                            </div>
+                            <p className="text-sm text-gray-500">Ventas Totales</p>
+                            <h4 className="text-2xl font-bold text-gray-800">${dashboardStats.salesToday.toFixed(2)}</h4>
+                        </div>
+
+                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 shadow-sm">
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="p-2 bg-purple-100 rounded-lg text-purple-600">
+                                    <TrendingUp size={20} />
+                                </div>
+                                <span className="text-xs font-semibold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">Mes Actual</span>
+                            </div>
+                            <p className="text-sm text-gray-500">Ventas Acumuladas</p>
+                            <h4 className="text-2xl font-bold text-gray-800">${dashboardStats.salesMonth.toFixed(2)}</h4>
+                        </div>
+
+                        <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100 shadow-sm">
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="p-2 bg-yellow-100 rounded-lg text-yellow-600">
+                                    <Clock size={20} />
+                                </div>
+                                <span className="text-xs font-semibold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-full">Pendiente</span>
+                            </div>
+                            <p className="text-sm text-gray-500">Cuentas por Cobrar</p>
+                            <h4 className="text-2xl font-bold text-gray-800">${dashboardStats.pendingCredit.toFixed(2)}</h4>
+                        </div>
+                    </div>
+
+                    {/* Gráfico de Productos Más Vendidos */}
+                    <div className="bg-white border rounded-lg p-4 shadow-sm">
+                        <h4 className="font-bold text-gray-800 mb-4 flex items-center">
+                            <PieChart size={18} className="mr-2 text-gray-500" />
+                            Top 5 Productos Más Vendidos
+                        </h4>
+                        <div className="space-y-3">
+                            {dashboardStats.topProducts.length === 0 ? (
+                                <p className="text-sm text-gray-400 italic text-center py-4">No hay datos de ventas suficientes.</p>
+                            ) : (
+                                dashboardStats.topProducts.map((product, index) => (
+                                    <div key={product.name} className="relative">
+                                        <div className="flex justify-between text-sm mb-1">
+                                            <span className="font-medium text-gray-700">{index + 1}. {product.name}</span>
+                                            <span className="text-gray-500">{product.quantity} un.</span>
+                                        </div>
+                                        <div className="w-full bg-gray-100 rounded-full h-2.5">
+                                            <div 
+                                                className="bg-blue-600 h-2.5 rounded-full" 
+                                                style={{ width: `${(product.quantity / dashboardStats.maxQuantity) * 100}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Vista: Modificar Precios */}
             {adminView === 'edit' && (
