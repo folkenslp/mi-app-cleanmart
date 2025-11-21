@@ -145,6 +145,9 @@ export default function App() {
   const [customFragrance, setCustomFragrance] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedDishSoapFragrance, setSelectedDishSoapFragrance] = useState('');
+  const [selectedHandSoapFragrance, setSelectedHandSoapFragrance] = useState('');
+  // --- NUEVO ESTADO: Aroma Fabuloso ---
+  const [selectedFabulosoFragrance, setSelectedFabulosoFragrance] = useState('');
 
 
   // Estados para FUNCIONES GEMINI
@@ -179,10 +182,12 @@ export default function App() {
   const sizesForSpecialProducts = ['500ml', '1L', '2L', '5L', '10L', '20L', 'Galón'];
   const sizesForPastillas = ['1/2 Kg', '1 Kg'];
   const dishSoapFragrances = ['LIMÓN', 'NARANJA'];
+  const handSoapFragrances = ['KIWI', 'FRESA', 'COCO', 'NEUTRO BALANCE', 'NARANJA', 'MENTA', 'NORDIKO'];
+  // --- Se Agregó la lista de aromas para Fabuloso ---
+  const fabulosoFragrances = ['LAVANDA', 'FLORAL', 'MAR FRESCO'];
   const emojis = ['🧴', '🧪', '🧽', '🍽️', '🌲', '🧺', '🌸', '💧', '🧼', '🎨', '✨', '💫', '🫧', '⚪', '🔧', '🧹', '👕', '🦟', '🌿', '🪟', '🐜', '🚿', '🌺', '🐾', '🚽', '🟢'];
 
   const productsWithCustomFragrance = [
-    'Limpiador Multiusos Tipo Fabuloso',
     'Shampoo Capilar a Base de Romero',
     'Aromatizante',
     'Body Shower'
@@ -250,6 +255,8 @@ export default function App() {
     setCustomFragrance('');
     setSelectedSize('');
     setSelectedDishSoapFragrance(''); // Resetea el aroma de trastes
+    setSelectedHandSoapFragrance(''); // Resetea el aroma de manos
+    setSelectedFabulosoFragrance(''); // Resetea el aroma de fabuloso
     setShowProductModal(true);
   };
 
@@ -279,6 +286,8 @@ export default function App() {
   const confirmAddToCart = () => {
     const needsCustomFragrance = productsWithCustomFragrance.includes(selectedProduct.name);
     const isDishSoap = selectedProduct.id === 3;
+    const isHandSoap = selectedProduct.id === 16;
+    const isFabuloso = selectedProduct.id === 2;
     const isPastillasCloro = selectedProduct.id === 17;
     
     let finalFragrance = "N/A";
@@ -297,6 +306,18 @@ export default function App() {
         return;
       }
       finalFragrance = selectedDishSoapFragrance;
+    } else if (isHandSoap) {
+      if (!selectedHandSoapFragrance) {
+        alert('Por favor selecciona un aroma');
+        return;
+      }
+      finalFragrance = selectedHandSoapFragrance;
+    } else if (isFabuloso) {
+      if (!selectedFabulosoFragrance) {
+        alert('Por favor selecciona un aroma');
+        return;
+      }
+      finalFragrance = selectedFabulosoFragrance;
     }
     
     if (!selectedSize) {
@@ -897,6 +918,44 @@ export default function App() {
                 >
                   <option value="">-- Elige un aroma --</option>
                   {dishSoapFragrances.map(frag => (
+                    <option key={frag} value={frag}>{frag}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* 1.1. Selector para Jabón de Manos (ID 16) --- NUEVO --- */}
+            {selectedProduct.id === 16 && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Selecciona Aroma *
+                </label>
+                <select
+                  value={selectedHandSoapFragrance}
+                  onChange={(e) => setSelectedHandSoapFragrance(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Elige un aroma --</option>
+                  {handSoapFragrances.map(frag => (
+                    <option key={frag} value={frag}>{frag}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* 1.2. Selector para Fabuloso (ID 2) --- NUEVO --- */}
+            {selectedProduct.id === 2 && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Selecciona Aroma *
+                </label>
+                <select
+                  value={selectedFabulosoFragrance}
+                  onChange={(e) => setSelectedFabulosoFragrance(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Elige un aroma --</option>
+                  {fabulosoFragrances.map(frag => (
                     <option key={frag} value={frag}>{frag}</option>
                   ))}
                 </select>
